@@ -1,3 +1,10 @@
+"""
+BinPacking Class.
+
+Author: Arain, Linli
+Date: March 29, 2019.
+Inplementation of bin packing process.
+"""
 from __future__ import print_function
 import sys
 sys.path.append('..')
@@ -19,12 +26,13 @@ class BinPacking(Game):
         return np.array(b.pieces)
 
     def getBoardSize(self):
-        # (a,b) tuple
+        """Return board size."""
+        # (x,y) tuple
         return (self.n, self.n)
 
     def getActionSize(self):
-        # return number of actions
-        return self.n*self.n + 1
+        # return number of actions * bin numbers
+        return self.n*self.n*10 + 1
 
     def getNextState(self, board, player, action):
         # if player takes action on board, return next (board,player)
@@ -33,7 +41,7 @@ class BinPacking(Game):
             return (board, -player)
         b = Board(self.n)
         b.pieces = np.copy(board)
-        move = (int(action/self.n), action%self.n)
+        move = (int(action/self.n), action % self.n)
         b.execute_move(move, player)
         return (b.pieces, -player)
 
@@ -42,12 +50,12 @@ class BinPacking(Game):
         valids = [0]*self.getActionSize()
         b = Board(self.n)
         b.pieces = np.copy(board)
-        legalMoves =  b.get_legal_moves(player)
-        if len(legalMoves)==0:
-            valids[-1]=1
+        legalMoves = b.get_legal_moves(player)
+        if len(legalMoves) == 0:
+            valids[-1] = 1
             return np.array(valids)
         for x, y in legalMoves:
-            valids[self.n*x+y]=1
+            valids[self.n*x+y] = 1
         return np.array(valids)
 
     def getGameEnded(self, board, player):
@@ -55,13 +63,9 @@ class BinPacking(Game):
         # player = 1
         b = Board(self.n)
         b.pieces = np.copy(board)
-        if b.has_legal_moves(player):
+        if b.has_legal_moves():
             return 0
-        if b.has_legal_moves(-player):
-            return 0
-        if b.countDiff(player) > 0:
-            return 1
-        return -1
+        return 1  # need compared with alpha75
 
     def getCanonicalForm(self, board, player):
         # return state if player==1, else return -state if player==-1
@@ -92,24 +96,27 @@ class BinPacking(Game):
         b.pieces = np.copy(board)
         return b.countDiff(player)
 
+
 def display(board):
     n = board.shape[0]
 
     for y in range(n):
-        print (y,"|",end="")
+        print(y, "|", end="")
     print("")
     print(" -----------------------")
     for y in range(n):
-        print(y, "|",end="")    # print the row #
+        print(y, "|", end="")    # print the row #
         for x in range(n):
             piece = board[y][x]    # get the piece to print
-            if piece == -1: print("b ",end="")
-            elif piece == 1: print("W ",end="")
+            if piece == -1:
+                print("b ", end="")
+            elif piece == 1:
+                print("W ", end="")
             else:
-                if x==n:
-                    print("-",end="")
+                if x == n:
+                    print("-", end="")
                 else:
-                    print("- ",end="")
+                    print("- ", end="")
         print("|")
 
     print("   -----------------------")

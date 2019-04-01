@@ -12,6 +12,8 @@ Board data:
 Squares are stored and manipulated as (x,y) tuples.
 x is the column, y is the row.
 """
+import Bin
+import random
 
 
 class Board():
@@ -22,8 +24,12 @@ class Board():
     x is the column, y is the row.
     """
 
-    __feasible = [0, 1]  # 0 if there r no bin
+    __directions = [0, 1]  # move map directions
     __dim = [2, 3]  # 2-D or 3-D
+    bins = []
+    for i in range(10):
+        binGen = Bin(random.random(), random.random(), 0)
+        bins.append(binGen)
 
     def __init__(self, n):
         """Set up initial board configuration."""
@@ -38,124 +44,143 @@ class Board():
         """Get index."""
         return self.pieces[index]
 
-    def countDiff(self, color):
+    def countU(self, color):
         """
-        Counts the dif pieces of the given color.
+        Count the dif pieces of the given color.
 
         (1 for full white, 0 for empty spaces)
         """
         count = 0
         for y in range(self.n):
             for x in range(self.n):
-                if self[x][y] == color:
+                if self[x][y] == 1 & x != 0 & y != self.n - 1:
                     count += 1
-                else:
-                    count -= 1
         return count
 
-    def get_legal_moves(self, color):
+    def reward(self):
         """
-        Returns all the legal moves for the given color.
+        Count the dif pieces of the given color.
 
-        (1 for white, -1 for black
+        (1 for full white, 0 for empty spaces)
+        """
+        reward = 0
+        if all(self.bins.u):
+            return reward
+        else:
+            coverSum = 0
+            wsum = sum(bin.x for bin in self.bins)
+            hsum = sum(bin.y for bin in self.bins)
+            coverSum += wsum + hsum
+            cover = self.countU()
+            return coverSum/cover
+
+        for y in range(self.n):
+            for x in range(self.n):
+                if self[x][y] == color:
+                    count += 1
+        return count
+
+    def get_legal_moves(self, color, i):
+        """
+        Return all the legal moves for the given color.
+
+        (1 for white)
         """
         moves = set()  # stores the legal moves.
 
         # Get all the squares with pieces of the given color.
         for y in range(self.n):
             for x in range(self.n):
-                if self[x][y] == color:
-                    newmoves = self.get_moves_for_square((x, y))
+                if self[x][y] == 0:
+                    newmoves = self.get_moves_for_square((x, y), i)
                     moves.update(newmoves)
         return list(moves)
 
-    def has_legal_moves(self, color):
-        for y in range(self.n):
-            for x in range(self.n):
-                if self[x][y] == color:
-                    newmoves = self.get_moves_for_square((x, y))
-                    if len(newmoves) > 0:
-                        return True
+    def has_legal_moves(self):
+        """Return if exists legal move."""
+
+        if all(self.bins.u):
+            return True
         return False
 
-    def get_moves_for_square(self, square):
-        """Returns all the legal moves that use the given square as a base.
-        That is, if the given square is (3,4) and it contains a black piece,
-        and (3,5) and (3,6) contain white pieces, and (3,7) is empty, one
-        of the returned moves is (3,7) because everything from there to (3,4)
-        is flipped.
+    def get_moves_for_square(self, square, i):
+        """
+        Return all the legal moves that use the given square as a base.
+
+        That is, if the given square is (3,4), a bin with (x,y) = (2,2),
+        and (3,5)(3,6)(4,5)(4,6) is empty, one of the returned moves is (3,5)
+        because everything from there to (3,4) is flipped.
         """
         (x, y) = square
-
-        # determine the color of the piece.
-        color = self[x][y]
-
-        # skip empty source squares.
-        if color == 0:
-            return None
-
         # search all possible directions.
-        moves = []
+        moves = []  # move (i, x, y, direction)
         for direction in self.__directions:
-            move = self._discover_move(square, direction)
+            move = self._discover_move(square, direction, i)
             if move:
-                # print(square,move,direction)
+                # print(i, square, direction)
                 moves.append(move)
 
         # return the generated move list
         return moves
 
-    def execute_move(self, move, color):
+    def execute_move(self, move, color, i):
         """
         Perform the given move on the board, flips pieces as necessary.
-        color gives the color pf the piece to play (1=white,-1=black)
+
+        color gives the color pf the piece to play (1=white,0=black)
         """
         # Much like move generation, start at the new piece's square and
         # follow it on all 8 directions to look for a piece allowing flipping.
 
         # Add the piece to the empty square.
         # print(move)
-        flips = [flip for direction in self.__directions
-                 for flip in self._get_flips(move, direction, color)]
-        assert len(list(flips)) > 0
-        for x, y in flips:
-            # print(self[x][y],color)
-            self[x][y] = color
+        move = (1, 2, 3, 4)
+        for i, x, y, direction in move:
+            if direction == 0:
+                for x in [x, x+self.bins[i].x]:
+                    for y in [y, y+self.bins[i].y]:
+                        self[x][y] = color
+            else:
+                for x in [x, x+self.bins[i].y]:
+                    for y in [y, y+self.bins[i].x]:
+                        self[x][y] = color
+        return true
 
-    def _discover_move(self, origin, direction):
-        """ Returns the endpoint for a legal move, starting at the given origin,
-        moving by the given increment."""
+    def _discover_move(self, origin, direction, i):
+        """
+        Return the legal move.
+
+        starting at the given origin,
+        moving by the given increment.
+        """
         x, y = origin
-        color = self[x][y]
-        flips = []
+        bin = self.bins[i]
+        moves = list()
+        if direction == 0:
+            if all(self[x][y] == 0 for (x, y) in ([x, x+bin.x]), [y, y+bin.y])):
+                moves.append((x, y, i, direction))
+        else if direction == 1:
+            if all(self[x][y] == 0 for (x, y) in ([x, x+bin.y]), [y, y+bin.x])):
+                moves.append((x, y, i, direction))
+        else:
+            return None
+        return moves
 
-        for x, y in Board._increment_move(origin, direction, self.n):
-            if self[x][y] == 0:
-                if flips:
-                    # print("Found", x,y)
-                    return (x, y)
-                else:
-                    return None
-            elif self[x][y] == color:
-                return None
-            elif self[x][y] == -color:
-                # print("Flip",x,y)
-                flips.append((x, y))
 
-    def _get_flips(self, origin, direction, color):
-        """ Gets the list of flips for a vertex and direction to use with the
+    def _get_flips(self, origin, direction, i):
+        """Get the list of flips for a vertex and direction to use with the
         execute_move function """
-        #initialize variables
+        # initialize variables
         flips = [origin]
 
         for x, y in Board._increment_move(origin, direction, self.n):
-            #print(x,y)
+            # print(x,y)
             if self[x][y] == 0:
                 return []
             if self[x][y] == -color:
                 flips.append((x, y))
             elif self[x][y] == color and len(flips) > 0:
-                #print(flips)
+                # print(flips)
                 return flips
 
         return []
@@ -163,11 +188,11 @@ class Board():
     @staticmethod
     def _increment_move(move, direction, n):
         # print(move)
-        """ Generator expression for incrementing moves """
+        """Generate expression for incrementing moves."""
         move = list(map(sum, zip(move, direction)))
-        #move = (move[0]+direction[0], move[1]+direction[1])
+        # move = (move[0]+direction[0], move[1]+direction[1])
         while all(map(lambda x: 0 <= x < n, move)):
-        #while 0<=move[0] and move[0]<n and 0<=move[1] and move[1]<n:
+            # while 0<=move[0] and move[0]<n and 0<=move[1] and move[1]<n:
             yield move
-            move=list(map(sum,zip(move,direction)))
-            #move = (move[0]+direction[0],move[1]+direction[1])
+            move = list(map(sum, zip(move, direction)))
+            # move = (move[0]+direction[0],move[1]+direction[1])
