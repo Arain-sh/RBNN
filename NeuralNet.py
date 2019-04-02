@@ -1,11 +1,10 @@
 class NeuralNet():
     """
-    This class specifies the base NeuralNet class. To define your own neural
-    network, subclass this class and implement the functions below. The neural
-    network does not consider the current player, and instead only deals with
-    the canonical form of the board.
+    This class specifies the base NeuralNet class.
 
-    See othello/NNet.py for an example implementation.
+    To define your own neural network, subclass this class and implement
+    the functions below. The neural network does not consider the current
+    player, and instead only deals with the canonical form of the board.
     """
 
     def __init__(self, game):

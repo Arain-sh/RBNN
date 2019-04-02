@@ -165,34 +165,3 @@ class Board():
         else:
             return None
         return moves
-
-
-    def _get_flips(self, origin, direction, i):
-        """Get the list of flips for a vertex and direction to use with the
-        execute_move function """
-        # initialize variables
-        flips = [origin]
-
-        for x, y in Board._increment_move(origin, direction, self.n):
-            # print(x,y)
-            if self[x][y] == 0:
-                return []
-            if self[x][y] == -color:
-                flips.append((x, y))
-            elif self[x][y] == color and len(flips) > 0:
-                # print(flips)
-                return flips
-
-        return []
-
-    @staticmethod
-    def _increment_move(move, direction, n):
-        # print(move)
-        """Generate expression for incrementing moves."""
-        move = list(map(sum, zip(move, direction)))
-        # move = (move[0]+direction[0], move[1]+direction[1])
-        while all(map(lambda x: 0 <= x < n, move)):
-            # while 0<=move[0] and move[0]<n and 0<=move[1] and move[1]<n:
-            yield move
-            move = list(map(sum, zip(move, direction)))
-            # move = (move[0]+direction[0],move[1]+direction[1])

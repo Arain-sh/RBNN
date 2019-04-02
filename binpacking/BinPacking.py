@@ -35,6 +35,7 @@ class BinPacking(Game):
         return self.n*self.n*10 + 1
 
     def getNextState(self, board, player, action):
+        """Return next state."""
         # if player takes action on board, return next (board,player)
         # action must be a valid move
         if action == self.n*self.n:
