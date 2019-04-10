@@ -6,6 +6,8 @@ import random
 import numpy as np
 import math
 import sys
+from visdom import Visdom
+from tensorboardX import SummaryWriter
 sys.path.append('../../')
 from utils import *
 from pytorch_classification.utils import Bar, AverageMeter
@@ -18,12 +20,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 
-from .OthelloNNet import OthelloNNet as onnet
+from .BPNNET import BPNNET as onnet
 
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 10,
+    'epochs': 20,
     'batch_size': 64,
     'cuda': torch.cuda.is_available(),
     'num_channels': 512,
@@ -34,6 +36,7 @@ class NNetWrapper(NeuralNet):
         self.nnet = onnet(game, args)
         self.board_x, self.board_y = game.getBoardSize()
         self.action_size = game.getActionSize()
+        self.bins = game.getInitBins()
 
         if args.cuda:
             self.nnet.cuda()
@@ -43,6 +46,7 @@ class NNetWrapper(NeuralNet):
         examples: list of examples, each example is of form (board, pi, v)
         """
         optimizer = optim.Adam(self.nnet.parameters())
+        writer = SummaryWriter()
 
         for epoch in range(args.epochs):
             print('EPOCH ::: ' + str(epoch+1))
@@ -55,7 +59,6 @@ class NNetWrapper(NeuralNet):
 
             bar = Bar('Training Net', max=int(len(examples)/args.batch_size))
             batch_idx = 0
-
             while batch_idx < int(len(examples)/args.batch_size):
                 sample_ids = np.random.randint(len(examples), size=args.batch_size)
                 boards, pis, vs = list(zip(*[examples[i] for i in sample_ids]))
@@ -90,7 +93,13 @@ class NNetWrapper(NeuralNet):
                 end = time.time()
                 batch_idx += 1
 
+                # visdom plot
+                # vis = Visdom(env='main')
+                # vis.line(X=end, Y=l_pi, win='loss_pi',
+                #        opts={'title': 'loss_pi'})
                 # plot progress
+                writer.add_scalar('runs/ft', l_pi, epoch)
+                writer.add_scalar('runs/lv', l_v, epoch)
                 bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss_pi: {lpi:.4f} | Loss_v: {lv:.3f}'.format(
                             batch=batch_idx,
                             size=int(len(examples)/args.batch_size),
@@ -113,7 +122,8 @@ class NNetWrapper(NeuralNet):
 
         # preparing input
         board = torch.FloatTensor(board.astype(np.float64))
-        if args.cuda: board = board.contiguous().cuda()
+        if args.cuda:
+            board = board.contiguous().cuda()
         board = board.view(1, self.board_x, self.board_y)
         self.nnet.eval()
         with torch.no_grad():

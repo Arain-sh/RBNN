@@ -14,6 +14,7 @@ import os
 import sys
 from pickle import Pickler, Unpickler
 from random import shuffle
+import pdb
 
 
 class Coach():
@@ -24,6 +25,8 @@ class Coach():
     in Game and NeuralNet. args are specified in main.py.
     """
 
+    Buffer = [0]*200
+
     def __init__(self, game, nnet, args):
         self.game = game
         self.nnet = nnet
@@ -33,9 +36,11 @@ class Coach():
         self.trainExamplesHistory = []    # history of examples from args.numItersForTrainExamplesHistory latest iterations
         self.skipFirstSelfPlay = False  # can be overriden in loadTrainExamples()
 
-    def executeEpisode(self):
+    def executePit(self, mctsChoose, board, bins):
         """
-        This function executes one episode of self-play, starting with player 1.
+        Execute one episode of self-play.
+
+        Starting with player 1.
         As the game is played, each turn is added as a training example to
         trainExamples. The game is played till the game ends. After the game
         ends, the outcome of the game is used to assign values to each example
@@ -47,30 +52,121 @@ class Coach():
         Returns:
             trainExamples: a list of examples of the form (canonicalBoard,pi,v)
                            pi is the MCTS informed policy vector, v is +1 if
-                           the player eventually won the game, else -1.
+                           the player eventually greater than 75 percent of
+                           performence in the buffer and stored in it, else -1.
+
         """
-        trainExamples = []
-        board = self.game.getInitBoard()
+        board = np.copy(board)
+        bins = np.copy(bins)
+#        pdb.set_trace()
         self.curPlayer = 1
         episodeStep = 0
 
         while True:
             episodeStep += 1
-            canonicalBoard = self.game.getCanonicalForm(board, self.curPlayer)
+            canonicalBoard, canbins = self.game.getCanonicalForm(board,
+                                                                 bins,
+                                                                 self.curPlayer)
             temp = int(episodeStep < self.args.tempThreshold)
 
-            pi = self.mcts.getActionProb(canonicalBoard, temp=temp)
-            sym = self.game.getSymmetries(canonicalBoard, pi)
-            for b, p in sym:
-                trainExamples.append([b, self.curPlayer, p, None])
+            pi = mctsChoose.getActionProb(canonicalBoard, canbins, temp=temp)
+            # pdb.set_trace()
+            if pi is None:
+                return -100
+            sym = self.game.getSymmetries(canonicalBoard, canbins, pi)
 
-            action = np.random.choice(len(pi), p=pi)
-            board, self.curPlayer = self.game.getNextState(board, self.curPlayer, action)
+            if pi[-1] != 1:
+                action = np.random.choice(len(pi), p=pi)
+                i = action % 10
+                d = int(((action-i)/10) % 2)
+                tenxPy = action // 20
+                x = (tenxPy//10) % 10
+                y = tenxPy % 10
+                move = (i, x, y, d)
+                # pdb.set_trace()
+                board, nextbins, self.curPlayer = self.game.getNextState(board,
+                                                                         canbins,
+                                                                         self.curPlayer,
+                                                                         move)
+                bins = nextbins
+            else:
+                r = self.game.getGameReward(canonicalBoard,
+                                            canbins,
+                                            self.curPlayer)
+                return r
 
-            r = self.game.getGameEnded(board, self.curPlayer)
+    def executeEpisode(self, mctsChoose):
+        """
+        Execute one episode of self-play.
 
-            if r != 0:
-                return [(x[0], x[2], r*((-1)**(x[1] != self.curPlayer))) for x in trainExamples]
+        Starting with player 1.
+        As the game is played, each turn is added as a training example to
+        trainExamples. The game is played till the game ends. After the game
+        ends, the outcome of the game is used to assign values to each example
+        in trainExamples.
+
+        It uses a temp=1 if episodeStep < tempThreshold, and thereafter
+        uses temp=0.
+
+        Returns:
+            trainExamples: a list of examples of the form (canonicalBoard,pi,v)
+                           pi is the MCTS informed policy vector, v is +1 if
+                           the player eventually greater than 75 percent of
+                           performence in the buffer and stored in it, else -1.
+
+        """
+        trainExamples = []
+        board = self.game.getInitBoard()
+        bins = self.game.getInitBins()
+#        pdb.set_trace()
+        self.curPlayer = 1
+        episodeStep = 0
+
+        while True:
+            episodeStep += 1
+            canonicalBoard, canbins = self.game.getCanonicalForm(board,
+                                                                 bins,
+                                                                 self.curPlayer)
+            temp = int(episodeStep < self.args.tempThreshold)
+
+            pi = mctsChoose.getActionProb(canonicalBoard, canbins, temp=temp)
+            # pdb.set_trace()
+            if pi is None:
+                return [0, 0, -100]
+            sym = self.game.getSymmetries(canonicalBoard, canbins, pi)
+
+            if pi[-1] != 1:
+                action = np.random.choice(len(pi), p=pi)
+                i = action % 10
+                d = int(((action-i)/10) % 2)
+                tenxPy = action // 20
+                x = (tenxPy//10) % 10
+                y = tenxPy % 10
+                move = (i, x, y, d)
+                # pdb.set_trace()
+                board, nextbins, self.curPlayer = self.game.getNextState(board,
+                                                                         canbins,
+                                                                         self.curPlayer,
+                                                                         move)
+                bins = nextbins
+                r = self.game.getGameReward(board,
+                                            bins,
+                                            self.curPlayer)
+                trainExamples.append([board, self.curPlayer, pi, r])
+            else:
+                r = self.game.getGameEnded(canonicalBoard,
+                                           canbins, self.curPlayer)
+                if r != 0:
+                    if r > self.Buffer[150]:
+                        self.Buffer[0] = r
+                        self.Buffer.sort()
+                        for b, B, p in sym:
+                            trainExamples.append([b, self.curPlayer,
+                                                  p, None])
+                        return [(x[0], x[2], r) for x in trainExamples]
+                    else:
+                        return []
+
 
     def learn(self):
         """
@@ -86,7 +182,8 @@ class Coach():
             print('------ITER ' + str(i) + '------')
             # examples of the iteration
             if not self.skipFirstSelfPlay or i > 1:
-                iterationTrainExamples = deque([], maxlen=self.args.maxlenOfQueue)
+                iterationTrainExamples = deque([],
+                                               maxlen=self.args.maxlenOfQueue)
 
                 eps_time = AverageMeter()
                 bar = Bar('Self Play', max=self.args.numEps)
@@ -94,12 +191,12 @@ class Coach():
 
                 for eps in range(self.args.numEps):
                     self.mcts = MCTS(self.game, self.nnet, self.args)   # reset search tree
-                    iterationTrainExamples += self.executeEpisode()
+                    iterationTrainExamples += self.executeEpisode(self.mcts)
 
                     # bookkeeping + plot progress
                     eps_time.update(time.time() - end)
                     end = time.time()
-                    bar.suffix  = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps+1, maxeps=self.args.numEps, et=eps_time.avg,
+                    bar.suffix = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps+1, maxeps=self.args.numEps, et=eps_time.avg,
                                                                                                                total=bar.elapsed_td, eta=bar.eta_td)
                     bar.next()
                 bar.finish()
@@ -129,9 +226,25 @@ class Coach():
             nmcts = MCTS(self.game, self.nnet, self.args)
 
             print('PITTING AGAINST PREVIOUS VERSION')
-            arena = Arena(lambda x: np.argmax(pmcts.getActionProb(x, temp=0)),
-                          lambda x: np.argmax(nmcts.getActionProb(x, temp=0)), self.game)
-            pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
+
+            pwins = 0
+            nwins = 0
+            draws = 0
+            for i in range(self.args.arenaCompare):
+                pitBoard = self.game.getInitBoard()
+                pitBins = self.game.getInitBins()
+                return_pmcts = self.executePit(pmcts, pitBoard, pitBins)
+                return_nmcts = self.executePit(nmcts, pitBoard, pitBins)
+                if return_nmcts > return_pmcts:
+                    nwins += 1
+                elif return_nmcts < return_pmcts:
+                    pwins += 1
+                else:
+                    draws += 1
+            # arena = Arena(lambda x: np.argmax(pmcts.getActionProb(x, temp=0)),
+            #               lambda x: np.argmax(nmcts.getActionProb(x, temp=0)),
+            #               self.game)
+            # pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
 
             print('NEW/PREV WINS : %d / %d ; DRAWS : %d' % (nwins, pwins, draws))
             if pwins+nwins == 0 or float(nwins)/(pwins+nwins) < self.args.updateThreshold:

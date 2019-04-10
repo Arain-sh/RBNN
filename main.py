@@ -5,31 +5,31 @@ Training
 """
 
 from Coach import Coach
-from binpacking.OthelloGame import OthelloGame as Game
+from binpacking.BinPacking import BinPacking as Game
 from binpacking.pytorch.NNet import NNetWrapper as nn
 from utils import dotdict
 
 
 args = dotdict({
     'numIters': 1000,
-    'numEps': 100,
+    'numEps': 300,
     'tempThreshold': 15,
     'updateThreshold': 0.6,
     'maxlenOfQueue': 200000,
-    'numMCTSSims': 25,
+    'numMCTSSims': 50,
     'arenaCompare': 40,
     'cpuct': 1,
 
     'checkpoint': './checkpoint/',
     'load_model': False,
-    'load_folder_file': ('/dev/models/8x100x50', 'best.pth.tar'),
+    'load_folder_file': ('/models/8x100x50', 'best.pth.tar'),
     'numItersForTrainExamplesHistory': 20,
 
 })
 
 
 if __name__ == "__main__":
-    g = Game(6)
+    g = Game(10)
     nnet = nn(g)
 
     if args.load_model:

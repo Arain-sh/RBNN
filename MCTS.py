@@ -1,6 +1,10 @@
 import math
 import numpy as np
+import sys
+import pdb
 EPS = 1e-8
+
+sys.setrecursionlimit(3000)
 
 
 class MCTS():
@@ -27,7 +31,7 @@ class MCTS():
         self.Es = {}        # stores game.getGameEnded ended for board s
         self.Vs = {}        # stores game.getValidMoves for board s
 
-    def getActionProb(self, canonicalBoard, temp=1):
+    def getActionProb(self, canonicalBoard, bins, temp=1):
         """
         This function performs numMCTSSims simulations of MCTS starting from
         canonicalBoard.
@@ -36,10 +40,17 @@ class MCTS():
             probs: a policy vector where the probability of the ith action is
                    proportional to Nsa[(s,a)]**(1./temp)
         """
-        for i in range(self.args.numMCTSSims):
-            self.search(canonicalBoard)
+        if self.game.getGameEnded(canonicalBoard, bins, 1) == 0:
+            for i in range(self.args.numMCTSSims):
+                # print('getAP:', i)
+                self.search(canonicalBoard, bins)
+                # pdb.set_trace()
+        else:
+            counts = [0]*self.game.getActionSize()
+            counts[-1] = 1
+            return counts
 
-        s = self.game.stringRepresentation(canonicalBoard)
+        s = self.game.stringRepresentation(canonicalBoard, bins)
         counts = [self.Nsa[(s, a)] if (s, a) in self.Nsa else 0 for a in range(self.game.getActionSize())]
 
         if temp == 0:
@@ -49,41 +60,48 @@ class MCTS():
             return probs
 
         counts = [x**(1./temp) for x in counts]
-        probs = [x/float(sum(counts)) for x in counts]
-        return probs
+        if sum(counts) != 0:
+            probs = [x/float(sum(counts)) for x in counts]
+            return probs
 
-    def search(self, canonicalBoard):
+    def search(self, canonicalBoard, bins):
         """
-        This function performs one iteration of MCTS. It is recursively called
+        Perform one iteration of MCTS.
+
+        It is recursively called
         till a leaf node is found. The action chosen at each node is one that
         has the maximum upper confidence bound as in the paper.
 
         Once a leaf node is found, the neural network is called to return an
         initial policy P and a value v for the state. This value is propogated
         up the search path. In case the leaf node is a terminal state, the
-        outcome is propogated up the search path. The values of Ns, Nsa, Qsa are
-        updated.
+        outcome is propogated up the search path. The values of Ns, Nsa,
+        Qsa are updated.
 
         NOTE: the return values are the negative of the value of the current
         state. This is done since v is in [-1,1] and if v is the value of a
-        state for the current player, then its value is -v for the other player.
+        state for the current player, then value is -v for the other player.
 
         Returns:
             v: the negative of the value of the current canonicalBoard
+
         """
-
-        s = self.game.stringRepresentation(canonicalBoard)
-
+        # print('MCTSf:')
+        # print(canonicalBoard)
+        searchBins = np.copy(bins)
+        # print(searchBins)
+        s = self.game.stringRepresentation(canonicalBoard, searchBins)
         if s not in self.Es:
-            self.Es[s] = self.game.getGameEnded(canonicalBoard, 1)
+            self.Es[s] = self.game.getGameEnded(canonicalBoard, searchBins, 1)
+            # print('MCTS.search.es:', self.Es[s])
         if self.Es[s] != 0:
             # terminal node
-            return -self.Es[s]
+            return self.Es[s]
 
         if s not in self.Ps:
             # leaf node
             self.Ps[s], v = self.nnet.predict(canonicalBoard)
-            valids = self.game.getValidMoves(canonicalBoard, 1)
+            valids = self.game.getValidMoves(canonicalBoard, searchBins, 1)
             self.Ps[s] = self.Ps[s]*valids      # masking invalid moves
             sum_Ps_s = np.sum(self.Ps[s])
             if sum_Ps_s > 0:
@@ -99,11 +117,17 @@ class MCTS():
 
             self.Vs[s] = valids
             self.Ns[s] = 0
-            return -v
+            if valids[-1] == 1:
+                return -10
+            # print('MCTS.v:', v)
+            return v
 
         valids = self.Vs[s]
         cur_best = -float('inf')
         best_act = -1
+
+        if valids[-1] == 1:
+            return -10
 
         # pick the action with the highest upper confidence bound
         for a in range(self.game.getActionSize()):
@@ -111,17 +135,37 @@ class MCTS():
                 if (s, a) in self.Qsa:
                     u = self.Qsa[(s, a)] + self.args.cpuct*self.Ps[s][a]*math.sqrt(self.Ns[s])/(1+self.Nsa[(s,a)])
                 else:
-                    u = self.args.cpuct*self.Ps[s][a]*math.sqrt(self.Ns[s] + EPS)     # Q = 0 ?
+                    u = self.args.cpuct*self.Ps[s][a]*math.sqrt(self.Ns[s] +
+                                                                EPS)  # Q = 0 ?
 
                 if u > cur_best:
                     cur_best = u
                     best_act = a
 
         a = best_act
-        next_s, next_player = self.game.getNextState(canonicalBoard, 1, a)
-        next_s = self.game.getCanonicalForm(next_s, next_player)
+        i = a % 10
+        d = int(((a-i)/10) % 2)
+        tenxPy = a // 20
+        x = (tenxPy//10) % 10
+        y = tenxPy % 10
 
-        v = self.search(next_s)
+        genmove = (i, x, y, d)
+        # print('MCTS.genmove:', genmove)
+        # print('MCTS.iu')
+        # for i in range(10):
+        #     print(searchBins[i][2], end=' ')
+        # print()
+        next_s, next_bins, next_player = self.game.getNextState(canonicalBoard,
+                                                                searchBins,
+                                                                1,
+                                                                genmove)
+        # print('MCTS.next_s:')
+        # print(next_s)
+        next_s, next_bins = self.game.getCanonicalForm(next_s,
+                                                       next_bins,
+                                                       next_player)
+
+        v = self.search(next_s, next_bins)
 
         if (s, a) in self.Qsa:
             self.Qsa[(s, a)] = (self.Nsa[(s, a)]*self.Qsa[(s, a)] + v)/(self.Nsa[(s, a)]+1)
@@ -132,4 +176,5 @@ class MCTS():
             self.Nsa[(s, a)] = 1
 
         self.Ns[s] += 1
-        return -v
+        # print('MCTS.v.final:', v)
+        return v

@@ -36,7 +36,7 @@ class HumanOthelloPlayer():
         return a
 
 
-class GreedyOthelloPlayer():
+class GreedyPlayer():
     def __init__(self, game):
         self.game = game
 
