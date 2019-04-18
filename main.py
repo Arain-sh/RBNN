@@ -12,7 +12,7 @@ from utils import dotdict
 
 args = dotdict({
     'numIters': 1000,
-    'numEps': 300,
+    'numEps':   400,
     'tempThreshold': 15,
     'updateThreshold': 0.6,
     'maxlenOfQueue': 200000,
@@ -20,10 +20,10 @@ args = dotdict({
     'arenaCompare': 40,
     'cpuct': 1,
 
-    'checkpoint': './checkpoint/',
-    'load_model': False,
-    'load_folder_file': ('/models/8x100x50', 'best.pth.tar'),
-    'numItersForTrainExamplesHistory': 20,
+    'checkpoint': '/home/arain/data/checkpoint/',
+    'load_model': True,
+    'load_folder_file': ('/home/arain/data/checkpoint/model/', 'best.pth.tar'),
+    'numItersForTrainExamplesHistory': 25,  # 20
 
 })
 

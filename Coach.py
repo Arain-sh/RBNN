@@ -71,9 +71,6 @@ class Coach():
 
             pi = mctsChoose.getActionProb(canonicalBoard, canbins, temp=temp)
             # pdb.set_trace()
-            if pi is None:
-                return -100
-            sym = self.game.getSymmetries(canonicalBoard, canbins, pi)
 
             if pi[-1] != 1:
                 action = np.random.choice(len(pi), p=pi)
@@ -133,7 +130,6 @@ class Coach():
             # pdb.set_trace()
             if pi is None:
                 return [0, 0, -100]
-            sym = self.game.getSymmetries(canonicalBoard, canbins, pi)
 
             if pi[-1] != 1:
                 action = np.random.choice(len(pi), p=pi)
@@ -149,24 +145,35 @@ class Coach():
                                                                          self.curPlayer,
                                                                          move)
                 bins = nextbins
+                binBoard = [None]*10
+                for i in range(10):
+                    binBoard[i] = [0]*13
+
+                for i in range(10):
+                    binBoard[i] = np.append(board[i], bins[i])
+
+                bBnpa = np.array(binBoard)
                 r = self.game.getGameReward(board,
                                             bins,
                                             self.curPlayer)
-                trainExamples.append([board, self.curPlayer, pi, r])
+                trainExamples.append([bBnpa, self.curPlayer, pi, r])
             else:
                 r = self.game.getGameEnded(canonicalBoard,
                                            canbins, self.curPlayer)
                 if r != 0:
-                    if r > self.Buffer[150]:
-                        self.Buffer[0] = r
-                        self.Buffer.sort()
-                        for b, B, p in sym:
-                            trainExamples.append([b, self.curPlayer,
-                                                  p, None])
-                        return [(x[0], x[2], r) for x in trainExamples]
-                    else:
-                        return []
-
+                    # if r > self.Buffer[150]:
+                    #     self.Buffer[0] = r
+                    #     self.Buffer.sort()
+                    binBoard = [None]*10
+                    for i in range(10):
+                        binBoard[i] = [0]*13
+                    for i in range(10):
+                        binBoard[i] = np.append(board[i], bins[i])
+                    bBnpa = np.array(binBoard)
+                    trainExamples.append([bBnpa, self.curPlayer, pi, r])
+                    return [(x[0], x[2], r) for x in trainExamples]
+                    # else:
+                    #    return []
 
     def learn(self):
         """
@@ -235,6 +242,7 @@ class Coach():
                 pitBins = self.game.getInitBins()
                 return_pmcts = self.executePit(pmcts, pitBoard, pitBins)
                 return_nmcts = self.executePit(nmcts, pitBoard, pitBins)
+                print("Pitting: Game ", i)
                 if return_nmcts > return_pmcts:
                     nwins += 1
                 elif return_nmcts < return_pmcts:
@@ -245,7 +253,6 @@ class Coach():
             #               lambda x: np.argmax(nmcts.getActionProb(x, temp=0)),
             #               self.game)
             # pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
-
             print('NEW/PREV WINS : %d / %d ; DRAWS : %d' % (nwins, pwins, draws))
             if pwins+nwins == 0 or float(nwins)/(pwins+nwins) < self.args.updateThreshold:
                 print('REJECTING NEW MODEL')

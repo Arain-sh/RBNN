@@ -18,14 +18,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
 
 from .BPNNET import BPNNET as onnet
 
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 20,
+    'epochs': 10,
     'batch_size': 64,
     'cuda': torch.cuda.is_available(),
     'num_channels': 512,
@@ -60,7 +59,8 @@ class NNetWrapper(NeuralNet):
             bar = Bar('Training Net', max=int(len(examples)/args.batch_size))
             batch_idx = 0
             while batch_idx < int(len(examples)/args.batch_size):
-                sample_ids = np.random.randint(len(examples), size=args.batch_size)
+                sample_ids = np.random.randint(len(examples),
+                                               size=args.batch_size)
                 boards, pis, vs = list(zip(*[examples[i] for i in sample_ids]))
                 boards = torch.FloatTensor(np.array(boards).astype(np.float64))
                 target_pis = torch.FloatTensor(np.array(pis))
@@ -93,13 +93,8 @@ class NNetWrapper(NeuralNet):
                 end = time.time()
                 batch_idx += 1
 
-                # visdom plot
-                # vis = Visdom(env='main')
-                # vis.line(X=end, Y=l_pi, win='loss_pi',
-                #        opts={'title': 'loss_pi'})
-                # plot progress
-                writer.add_scalar('runs/ft', l_pi, epoch)
-                writer.add_scalar('runs/lv', l_v, epoch)
+                writer.add_scalar('runs/ft', pi_losses.avg, epoch)
+                writer.add_scalar('runs/lv', v_losses.avg, epoch)
                 bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss_pi: {lpi:.4f} | Loss_v: {lv:.3f}'.format(
                             batch=batch_idx,
                             size=int(len(examples)/args.batch_size),
@@ -124,7 +119,7 @@ class NNetWrapper(NeuralNet):
         board = torch.FloatTensor(board.astype(np.float64))
         if args.cuda:
             board = board.contiguous().cuda()
-        board = board.view(1, self.board_x, self.board_y)
+        board = board.view(1, self.board_x, self.board_y+3)
         self.nnet.eval()
         with torch.no_grad():
             pi, v = self.nnet(board)
