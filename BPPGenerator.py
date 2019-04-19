@@ -45,6 +45,6 @@ class BPPGenerator():
 
 
 if __name__ == '__main__':
-	data = BPPGenerator(10, [10, 10], 1)
+	data = BPPGenerator(100, [10, 10, 10], 1)
 	batch_data = data.BatchData()
 	print(batch_data)
