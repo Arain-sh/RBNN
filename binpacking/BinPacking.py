@@ -28,7 +28,7 @@ class BinPacking(Game):
     def getInitBins(self):
         """Return initial bins information"""
         bins = Board(self.n).bins
-        batch_data, rot = BPPGenerator(10, [10, 10], 1).BatchData()
+        batch_data = BPPGenerator(10, [10, 10], 1).BatchData()
         abin = batch_data[0]
         for i in range(10):
             bins[i] = abin[i] + [0]

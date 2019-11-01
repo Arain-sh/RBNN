@@ -19,7 +19,8 @@ class BPPGenerator():
 				pop_item = [1]
 				while max(pop_item) == 1:
 					choose_item = random.randint(0, len(items) - 1)
-					pop_item = items.pop(choose_item)
+					pop_item = items[choose_item]
+				pop_item = items.pop(choose_item)
 				choose_axis = random.randint(0, len(Bin) - 1)
 				while pop_item[choose_axis] == 1:#cannot split
 					choose_axis = random.randint(0, len(Bin) - 1)
@@ -33,18 +34,23 @@ class BPPGenerator():
 				rotation = np.random.randint(0, 2, (N, 3)).tolist()
 			else:
 				rotation = np.random.randint(0, 2, N).tolist()
-			return items, rotation
+			return items,
 		batch_items, batch_rotation = [], []
 		i = 0
 		while i < self.batch_size:
 			data = BPPGenerator(self.N, self.Bin)
 			batch_items.append(data[0])
-			batch_rotation.append(data[1])
+			# batch_rotation.append(data[1])
 			i += 1
-		return batch_items, batch_rotation
+		return batch_items
 
 
 if __name__ == '__main__':
-	data = BPPGenerator(100, [10, 10, 10], 1)
+	numBin = 10
+	iter = random.randint(1, numBin)
+	data = BPPGenerator(iter, [10, 10], 1)
 	batch_data = data.BatchData()
+	needAdd = numBin - len(batch_data[0])
+	for i in range(needAdd):
+		batch_data.append([0, 0])
 	print(batch_data)

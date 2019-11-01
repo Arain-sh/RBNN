@@ -126,8 +126,6 @@ class MCTS():
 
             self.Vs[s] = valids
             self.Ns[s] = 0
-            if valids[-1] == 1:
-                return -1
             # print('MCTS.v:', v)
             return v
 
@@ -136,6 +134,9 @@ class MCTS():
         best_act = -1
 
         if valids[-1] == 1:
+            spaceReward = self.getGameEnded(canonicalBoard, searchBins, 1)
+            if spaceReward > 0:
+                return spaceReward
             return -1
 
         # pick the action with the highest upper confidence bound
